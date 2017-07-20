@@ -1,11 +1,10 @@
 # psplinesL1
-[Summary]
+This package fits additive mixed models with P-splines and and an l_1 penalty using alternating direction method of multipliers and cross-validation.
 
 ## Installation
 
 ```{r}
-# install.packages("devtools")
-library("devtools")
+library(devtools)
 install_github("bdsegal/psplinesl1")
 ```
 
@@ -54,4 +53,4 @@ ggplot(aes(x = x, y = y), data = newDat)+
 
 ## References
 
-Segal, B. D., Elliott, M. R., Braun, T., Jiang, H. P-splines with and $\ell_1$ penalty for repeated measures. Working draft available online at [insert link].
+Segal, B. D., Elliott, M. R., Braun, T., Jiang, H. P-splines with an l1 penalty for repeated measures. 
