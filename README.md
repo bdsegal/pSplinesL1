@@ -50,4 +50,4 @@ ggplot(aes(x = x, y = y), data = newDat)+
 ```
 
 ## References
-Segal, B. D., Elliott, M. R., Braun, T., Jiang, H. P-splines with an l1 penalty for repeated measures. 
+Segal, B. D., Elliott, M. R., Braun, T., Jiang, H. P-splines with an l1 penalty for repeated measures. Submitted.
