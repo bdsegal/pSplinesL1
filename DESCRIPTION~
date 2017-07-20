@@ -1,9 +1,0 @@
-Package: psplinesl1
-Title: P-splines with an l_1 penalty for repeated measures
-Version: 0.0.0.9000
-Authors@R: person("Brian", "Segal", email = "bdsegal@umich.edu", role = c("aut", "cre"))
-Description: This package fits additive mixed models with P-splines and and an l_1 penalty using alternating direction method of multipliers and cross-validation.
-Depends: R (>= 3.1), Matrix, fda, MASS, ggplot2
-License: GPL (>= 3)
-LazyData: true
-RoxygenNote: 5.0.1
