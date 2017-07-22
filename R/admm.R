@@ -36,7 +36,6 @@ admm <- function(y,
   #' @keywords ADMM
   #' @export
   #' @examples
-  #' @examples
   #' library(psplinesl1)
   #' data(simData)
   #'
@@ -156,10 +155,6 @@ admm <- function(y,
         }
       beta[[j]] <- backsolve(Fqr[[j]]$R, Fqr[[j]]$Qt %*% (crossprod(X[[j]]$F, yRes) + 
                              rho * crossprod(X[[j]]$D, w[[j]] - u[[j]])))
-      # beta[[j]] <- backsolve(Fqr[[j]]$R, Fqr[[j]]$Qt %*% (t(X[[j]]$F) %*% yRes + 
-                           # rho * t(X[[j]]$D) %*% (w[[j]] - u[[j]])))
-      # beta[[j]] <- solve(Finter[[j]], t(X[[j]]$F) %*% yRes + rho * t(X[[j]]$D) %*% (w[[j]] - u[[j]]))
-
     }
 
     # w updates
@@ -190,10 +185,10 @@ admm <- function(y,
       yRes <- yRes - X[[j]]$F %*% beta[[j]]
     }
 
-    # TODO: write conditional statement to use backsolve when possible
-    # b <- backsolve(ZSqr$R, ZSqr$Qt %*% t(Z) %*% yRes)
-    b <- solve(crossprod(Z) + tau * S, crossprod(Z, yRes))
+    # update b
+    b <- backsolve(ZSqr$R, ZSqr$Qt %*% crossprod(Z, yRes))
 
+    # get primal and dual residuals
     r <- do.call(c, rList)
     s <- do.call(c, sList)
 
