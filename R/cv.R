@@ -26,8 +26,8 @@ cv <- function(y,
   #' @param rand list of random effect terms setup by randomEffects
   #' @param id character string denoting subject id variable
   #' @param data dataset
-  #' @param se1 TRUE/FALSE if true, sets smoothing parameter to smallest
-  #'        value larger than one standard deviation of minimum CV error
+  #' @param se1 TRUE/FALSE if true, sets smoothing parameter to value with
+  #'        maximum CV error within 1 sd of the value that minimizes CV error
   #' @param smoothInit vector of initial smoothing parameter values
   #' @param pathLength length of each smoothing parameter path
   #'        (evenly spaced on the log scale)
@@ -192,7 +192,7 @@ cv <- function(y,
   names(smoothOpt) <- c("tau", paste("lambda", 1:J, sep = ""))
 
   # separate warm starts for each fold
-  warm <- vector("list", J + 1)
+  warm <- vector("list", K)
 
   CVlong <- data.frame(param = factor(rep(c("tau", paste("lambda[", 1:J, "]", sep = "")), 
                                    each = pathLength),
@@ -262,7 +262,7 @@ cv <- function(y,
              epsilonAbs = epsilonAbs,
              epsilonRel = epsilonRel,
              iterMax = iterMax,
-             warm = warm[[j]],
+             warm = warm[[k]],
              data = train,
              centerZ = centerZ,
              forCV = TRUE)
@@ -284,8 +284,7 @@ cv <- function(y,
         }
 
         cvTemp[k] <- sum((test[, ycol] - yTestHat)^2)
-
-        warm[[j]] <- m1$warm
+        warm[[k]] <- m1$warm
 
         if(verbose >= 2) {
           print(paste("fold: ", k,
@@ -298,22 +297,20 @@ cv <- function(y,
       CVlong$cv[(j-1)*pathLength + pathIter] <- sum(cvTemp)
       CVlong$sd[(j-1)*pathLength + pathIter] <- sd(cvTemp)
 
-      # # if min cv, retain ADMM output for later
-      # if(CVlong$cv[(j-1)*pathLength + pathIter] <= 
-      #    min(CVlong$cv[((j-1)*pathLength + 1):(j*pathLength)], nr.rm = TRUE)) {
-      # }
     }
     
     smoothjcv <- CVlong$cv[((j-1)*pathLength + 1):(j*pathLength)]
+    smoothjsd <- CVlong$sd[((j-1)*pathLength + 1):(j*pathLength)]
+    minInd[j] <- which.min(smoothjcv)
     if (se1) { 
-      ind1se <- which.min(smoothjcv > min(smoothjcv) + sd(smoothjcv))
+      # TODO: fix
+      ind1se <- which.max(smoothjcv <= smoothjcv[minInd[j]] + smoothjsd[minInd[j]])
       smoothOpt[j] <- smoothPath[[j]][ind1se]
     } else {
     # in case of tie, largest parameter selected (smallest df)
       smoothOpt[j] <- smoothPath[[j]][which.min(smoothjcv)]
     }
 
-    minInd[j] <- which.min(smoothjcv)
     cvVlines <- data.frame(pathVal = sapply(1:(J+1), function(l) {
                                            smoothPath[[l]][minInd[l]]}),
                            param = c("tau", paste("lambda[", 1:J, "]", sep = "")))
@@ -348,109 +345,3 @@ print.cv <- function(out){
   print(out$smoothOpt)
   print(out$gg)
 }
-
-
-# l1ADMMcvRandIntGrid <- function(y, X, Zlist,
-#              K=5,
-#              smoothInit = NULL,
-#              lamdbdaMax = lambdaMax,
-#              pathLength = 20,
-#              epsilonAbs = 1e-4,
-#              epsilonRel = 1e-4,
-#              iterMax = 1e3,
-#              data
-#              ) {
-
-#   smoothPath <- exp(seq(log(lambdaMax), 
-#                        log(lambdaMax*1e-5), 
-#                        length.out = pathLength))
-#   # setup folds with some high vig and low vig in each fold
-#   fold <- list()
-#   uniqId <- unique(data$id)
-#   nid <- floor(length(uniqId) / K)
-#   for (k in 1:K) {
-#     if (k < K) {
-#       fold[[k]] <- uniqId[((k-1)*nid + 1):(k*nid)]
-#     } else {
-#       fold[[k]] <- uniqId[((k-1)*nid + 1):length(uniqId)]
-#     }
-#   }
-  
-#   L <- length(X) # number of smooths
-  
-#   smoothMat <- expand.grid(smoothPath, smoothPath)
-
-#   colnames(smoothMat) <- c("tau", paste("lambda", 1:L, sep = ""))
-#   warm <- vector("list", K)
-
-#   CVmat <- cbind(smoothMat, cv = NA, sd = NA)
-
-#   for (i in 1:nrow(smoothMat)) {
-
-#     print("")
-#     print(paste(i, " of ", nrow(smoothMat),  sep = ""))
-#     print(smoothMat[i, ])
-
-#     rho <- min(15, max(smoothMat[i, ]))
-
-#     # k-fold cross-validation
-#     cvTemp <- rep(0, K)
-#     for (k in 1:K) {
-#       testRec <- (data$id %in% fold[[k]])
-#       train <- data[!testRec, ]
-#       test <- data[testRec, ]
-
-#       nTrain <- table(train$id)
-#       nTest <- table(test$id)
-
-#       Xtrain <- Xtest <- X
-#       for (l in 1:L) {
-#         Xtrain[[l]]$F <- X[[l]]$F[!testRec, ]
-#         Xtest[[l]]$F <- X[[l]]$F[testRec, ]
-#       }
-
-#       Zkeep <- which(! uniqId %in% fold[[k]])
-#       Ztrain <- as.matrix(bdiag(Zlist[Zkeep]))
-#       Strain <- diag(ncol(Ztrain)) # for random intercepts only
-      
-#       # ggplot(aes(x = x, y = y, group = id), data = train)+
-#       # geom_line()+
-#       # geom_point()+
-#       # theme_bw()
-
-#       m1 <- l1ADMMcv(y = train$y, X = Xtrain, Z = Ztrain, S = Strain,
-#            lambda = smoothMat[i, -1],
-#            tau = smoothMat[i, 1],
-#            rho = rho,
-#            epsilonAbs = epsilonAbs,
-#            epsilonRel = epsilonRel,
-#            iterMax = iterMax,
-#            warm = warm[[sl]],
-#            data = train)
-
-#       yCV <- rep(m1$warm$beta0, length(test$y))
-#       for (xl in 1:length(Xtrain)) {
-#         yCV <- yCV + Xtest[[xl]]$F %*% m1$warm$beta[[xl]]
-#       }
-#       cvTemp[k] <- sum((test$y - yCV)^2)
-#       # dfmat[pathVal, ,sl] <- m1$fit$edfVecL1
-
-#       warm[[sl]] <- m1$warm
-
-#      print(paste("fold = ", k,
-#               ", iter = ", m1$conv$iter, 
-#               ", CV = ", signif(sum(cvTemp), 4), 
-#               ", resid = ", signif(sum(m1$fit$residuals^2), 4),
-#               sep = ""))
-#     }
-#     CVmat[i, "cv"] <- sum(cvTemp)
-#     CVmat[i, "sd"] <- sd(cvTemp) # to do: use weighted sd in case folds not same size
-#   }
-
-#   ind1se <- which.min(CVmat[, "cv"] > min(CVmat[, "cv"]) + sd(CVmat[, "cv"]))
-#   indMin <- which.min(CVmat[, "cv"])
-
-#   smoothOpt <- smoothMat[c(ind1se, indMin), ]
-
-#   return(list(smoothOpt = smoothOpt, CVmat = CVmat))
-# }

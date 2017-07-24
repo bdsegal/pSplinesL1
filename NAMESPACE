@@ -2,10 +2,12 @@
 
 S3method(print,ci)
 S3method(print,cv)
+S3method(print,cvgrid)
 export(Mfun)
 export(admm)
 export(ci)
 export(cv)
+export(cvgrid)
 export(dfl1)
 export(msub)
 export(ps)
