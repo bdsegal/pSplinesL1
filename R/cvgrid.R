@@ -289,10 +289,10 @@ cvgrid <- function(y,
   minInd <- which.min(CVlong$cv)
   if (se1) { 
     ind1se <- which.max(CVlong$cv <= CVlong$cv[minInd] + CVlong$sd[minInd])
-    smoothOpt <- as.vector(CVlong[ind1se, 1:(J+1)])
+    smoothOpt <- as.numeric(CVlong[ind1se, 1:(J+1)])
   } else {
     # in case of tie, largest parameter selected (smallest df)
-    smoothOpt <- as.vector(CVlong[minInd, 1:(J+1)])
+    smoothOpt <- as.numeric(CVlong[minInd, 1:(J+1)])
   }
 
 
