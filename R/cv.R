@@ -256,8 +256,8 @@ cv <- function(y,
                     which(!colnames(rand$S) %in% fold[[k]])]           
 
         m1 <- admm(y = y, X = Xtrain, Z = Ztrain, S = Strain,
-             lambda = tauLambda[2:(J + 1)],
              tau = tauLambda[1],
+             lambda = tauLambda[2:(J + 1)],
              rho = rho,
              epsilonAbs = epsilonAbs,
              epsilonRel = epsilonRel,

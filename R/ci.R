@@ -78,7 +78,7 @@ ci <- function(model, alpha = 0.05) {
     
     F <- model$params$X[[j]]$F
     D <- model$params$X[[j]]$D
-    Lambda <- model$params$lambda[j] * crossprod(D, D)
+    Lambda <- model$params$lambda[j] * crossprod(D)
 
     if(j == 1) {
       F <- cbind(1, F)
@@ -92,7 +92,7 @@ ci <- function(model, alpha = 0.05) {
     Winv <- ginv(as.matrix(W)) # ginv probably not necessary, but safer coding
     HtHnormDiagBayes <- sqrt(rowSums((F %*% Winv) * F))
    
-    H <- F %*% solve(crossprod(F, F) + Lambda, t(F))
+    H <- F %*% solve(crossprod(F) + Lambda, t(F))
     HtHnormDiag <- sqrt(rowSums((H %*% V) * H))
 
     zQuant <- qnorm(1-alpha/2)

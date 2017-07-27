@@ -230,8 +230,8 @@ cvgrid <- function(y,
 
       tauLambda <- as.numeric(CVlong[gridIter, 1:(J+1)])
       m1 <- admm(y = y, X = Xtrain, Z = Ztrain, S = Strain,
-           lambda = tauLambda[2:(J + 1)],
            tau = tauLambda[1],
+           lambda = tauLambda[2:(J + 1)],
            rho = rho,
            epsilonAbs = epsilonAbs,
            epsilonRel = epsilonRel,
