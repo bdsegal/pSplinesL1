@@ -11,7 +11,6 @@
 }
 \description{
 This function prints the optimal smoothing parameters
-and prints the smoothing parameter paths
 }
 \keyword{cvgrid}
 \keyword{print}

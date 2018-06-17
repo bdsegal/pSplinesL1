@@ -70,7 +70,7 @@ a1 <- admm(y = "y", X, Z = rand$Z, S = rand$S,
 
 # get and plot fitted model with confidence bands
 CI <- ci(model = a1, alpha = 0.05)
-CI
+plot(CI)
 
 # extract values from ci object for custom plotting
 CIpoly <- data.frame(x = c(CI[[1]]$x, rev(CI[[1]]$x)), 

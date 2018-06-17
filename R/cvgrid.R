@@ -74,7 +74,7 @@ cvgrid <- function(y,
   #'
   #' # get and plot fitted model with confidence bands
   #' CI <- ci(model = a1, alpha = 0.05)
-  #' CI
+  #' plot(CI)
   #' 
   #' # extract values from ci object for custom plotting
   #' CIpoly <- data.frame(x = c(CI[[1]]$x, rev(CI[[1]]$x)), 
@@ -88,10 +88,11 @@ cvgrid <- function(y,
   ycol <- which(colnames(data) == y)
   J <- length(X) # number of smooths
 
+  beta0 <- mean(data[, ycol])
   lambdaMax <- rep(NA, J)
   for (j in 1:J) {
-    lambdaMax[j] <- max(abs(solve(tcrossprod(X[[j]]$D, X[[j]]$D), 
-                             tcrossprod(X[[j]]$D, X[[j]]$F) %*% data[, ycol])))
+    lambdaMax[j] <- max(abs(ginv(tcrossprod(X[[j]]$D, X[[j]]$D)) %*% X[[j]]$D %*%
+                            ginv(crossprod(X[[j]]$F, X[[j]]$F)) %*% t(X[[j]]$F) %*% (data[, ycol] - beta0)))
   }
 
   # By default use largest lambdaMax for tau (random effects)
@@ -99,7 +100,7 @@ cvgrid <- function(y,
   if(is.null(tauMax)) {
     tauLambdaMax <- c(max(lambdaMax), lambdaMax)
   } else {
-      tauLambdaMax <- c(tauMax, lambdaMax)
+    tauLambdaMax <- c(tauMax, lambdaMax)
   }
 
   # TODO: allow for different smoothing paths values
@@ -307,7 +308,6 @@ print.cvgrid <- function(out){
   #' Print function for cvgrid
   #'
   #' This function prints the optimal smoothing parameters
-  #' and prints the smoothing parameter paths
   #' @param out output from the cvgrid function
   #' @keywords cvgrid print
   #' @export
