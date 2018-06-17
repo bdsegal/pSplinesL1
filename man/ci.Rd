@@ -4,12 +4,14 @@
 \alias{ci}
 \title{Obtain confidence intervals for l1ADMM objects}
 \usage{
-ci(model, alpha = 0.05)
+ci(model, alpha = 0.05, newData = NULL)
 }
 \arguments{
 \item{model}{output from l1ADMM with cv = FALSE}
 
 \item{alpha}{confidence level}
+
+\item{newData}{new dataset at which to get the predicted values and confidence intervals}
 }
 \description{
 This function obtains Bayesian and Frequentist confidence bands

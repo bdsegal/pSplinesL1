@@ -1,30 +1,34 @@
 
 # with random effects,  -------------------------------------------------------
-admm <- function(y, 
+admm <- function(y,
+                 id, 
                  X, 
-                 Z,
-                 S,
+                 rand,
                  lambda,
                  tau,
                  data, 
                  rho = 1,
+                 lmeUpdate = FALSE,
                  epsilonAbs = 1e-4,
                  epsilonRel = 1e-4,
                  iterMax = 1e3,
                  warm = NULL,
                  forCV = FALSE,
                  centerZ = FALSE, 
-                 verbose = FALSE) {
+                 verbose = FALSE,
+                 uniUpper = 1000) {
   #' ADMM algorithm for fitting l1-penalized additive mixed models
   #'
   #' This function obtains point estimates via the ADMM algorithm
   #' @param y character string denoting output variable
+  #' @param id character string denoting id variable
   #' @param X list of fixed effect design matrices setup by l1smooth
   #' @param Z random effect design matrix setup by randomEffects
   #' @param S random effect penalty matrix setup by randomEffects
   #' @param lambda scalar smoothing parameter for random effects
   #' @param tau vector of smoothing parameters for fixed effects
   #' @param rho ADMM penalty parameter
+  #' @param lmeUpdate TRUE/FALSE if TRUE, uses lme to estimate random effects. Only available for random intercept models.
   #' @param epsilonAbs absolute error in ADMM (tolerance for convergence)
   #' @param epsilonRel relative error in ADMM (tolerance for convergence)
   #' @param iterMAx maximum number of ADMM iterations
@@ -33,6 +37,7 @@ admm <- function(y,
   #' @param forCV TRUE/FALSE If FALSE, returns less information in fitted object
   #' @param centerZ TRUE/FALSE If TRUE, imposes centering constraints on random effects
   #' @param verbose TRUE/FALSE If TRUE, prints ADMM iteration
+  #' @param uniUpper upper limit used by uniroot to estimate tau (only used when lmeUpdate = TRUE)
   #' @keywords ADMM
   #' @export
   #' @examples
@@ -68,13 +73,22 @@ admm <- function(y,
   #'   geom_polygon(data = CIpoly, fill = "grey")+
   #'   geom_line(aes(x = CI[[1]]$x, y = CI[[1]]$smooth))
 
-  ycol <- which(colnames(data) == y)
+
+  if(lmeUpdate & centerZ) {
+    stop("The lmeUpdate can only be used when centerZ = FALSE")
+  }
 
   if(length(X) != length(lambda)) {
     warning("number of smooths must equal number of smoothing parameters (lambda)")
   }
 
   J <- length(X)
+
+  yCol <- which(colnames(data) == y)
+  idCol <- which(colnames(data) == id)
+
+  Z <- rand$Z
+  S <- rand$S
 
   # centering constraints
   if(centerZ) {
@@ -89,16 +103,18 @@ admm <- function(y,
     Finter[[j]] <- crossprod(X[[j]]$F) + rho * crossprod(X[[j]]$D)
     qrDecomp <- qr(Finter[[j]], tol = 1e-10)
     Fqr[[j]] <- list(Qt = t(qr.Q(qrDecomp)),
-                           R = qr.R(qrDecomp))
+                     R = qr.R(qrDecomp))
   }
 
-  qrDecomp <- qr(crossprod(Z) + tau * S, tol = 1e-10)
-  if ("sparseQR" %in% class(qrDecomp)) {
-    ZSqr <- list(Qt = t(qr.Q(qrDecomp)), 
-                 R = qrR(qrDecomp))
-  } else {
-    ZSqr <- list(Qt = t(qr.Q(qrDecomp)), 
-                 R = qr.R(qrDecomp))
+  if (!lmeUpdate) {
+    qrDecomp <- qr(crossprod(Z) + tau * S, tol = 1e-10)
+    if ("sparseQR" %in% class(qrDecomp)) {
+      ZSqr <- list(Qt = t(qr.Q(qrDecomp)), 
+                   R = qrR(qrDecomp))
+    } else {
+      ZSqr <- list(Qt = t(qr.Q(qrDecomp)), 
+                   R = qr.R(qrDecomp))
+    }
   }
 
   if (is.null(warm)) {
@@ -117,9 +133,10 @@ admm <- function(y,
     wNew <- warm$wNew
     beta <- warm$beta
   }
-  b <- rep(0, ncol(Z))
 
+  b <- rep(0, ncol(Z))
   beta0 <- 0
+
   w <- list()
 
   conv <- FALSE
@@ -134,7 +151,7 @@ admm <- function(y,
     if(verbose){print(iter)}
 
     # beta0 update
-    yRes <- data[, ycol] - Z %*% b
+    yRes <- data[, yCol] - Z%*%b
     for (j in 1:J) {
       yRes <- yRes - X[[j]]$F %*% beta[[j]]
     }
@@ -147,7 +164,7 @@ admm <- function(y,
 
     # beta updates
     for (j in 1:J) {
-      yRes <- data[, ycol] - beta0 - Z%*%b
+      yRes <- data[, yCol] - beta0 - Z%*%b
         for (l in 1:J) {
           if (l != j) {
             yRes <- yRes - X[[l]]$F %*% beta[[l]]
@@ -180,13 +197,27 @@ admm <- function(y,
     }
 
     # random effects update
-    yRes <- data[, ycol] - beta0
+    yRes <- data[, yCol] - beta0
     for (j in 1:J) {
       yRes <- yRes - X[[j]]$F %*% beta[[j]]
     }
 
     # update b
-    b <- backsolve(ZSqr$R, ZSqr$Qt %*% crossprod(Z, yRes))
+    if (lmeUpdate) {
+      lmeDat <- data.frame(yRes = yRes, id = data[, idCol])
+      lmeFit <- lme(yRes ~ 1, random = list(id =~ 1), data = lmeDat)
+      b <- as.matrix(ranef(lmeFit)[[1]], ncol = 1)
+
+    } else {
+      b <- backsolve(ZSqr$R, ZSqr$Qt %*% crossprod(Z, yRes))
+    }
+
+    # # Under construction -- using lme for random curves
+    # lmeFit <- lme(yRes ~ 1, 
+    #               # random = list(id = pdSymm(~x), id = pdIdent(~Z - 1)),
+    #               random = list(id = pdIdent(~Zcheck1 - 1),
+    #                             id = pdIdent(~Zbreve2 - 1)),
+    #               data = lmeDat)
 
     # get primal and dual residuals
     r <- do.call(c, rList)
@@ -200,8 +231,8 @@ admm <- function(y,
     wBind <- do.call(rbind, wNew)
 
     epsilonPri <- sqrt(dimPrim) * epsilonAbs + 
-                  epsilonRel * max(norm(DbetaBind, type = "F"),
-                                   norm(wBind, type = "F"))
+                    epsilonRel * max(norm(DbetaBind, type = "F"),
+                                     norm(wBind, type = "F"))
 
     Du <- list()
     for (j in 1:J) {
@@ -223,8 +254,8 @@ admm <- function(y,
     yMarg <- yMarg + X[[j]]$F %*% beta[[j]]
   }
   yMarg <- as.vector(yMarg)
-  yHat <- as.vector(yMarg + Z %*% b)
-  residuals <- as.vector(data[, ycol] - yHat)
+  yHat <- as.vector(yMarg + Z%*%b)
+  residuals <- as.vector(data[, yCol] - yHat)
   
   if(forCV) {
     return(list(conv = list(converged = conv,
@@ -242,11 +273,20 @@ admm <- function(y,
           )
   } else {
 
+    if (lmeUpdate) {
+      sigma2b <- as.numeric(VarCorr(lmeFit)[1, 1])
+      tau <- NULL
+    } else {
+      sigma2b <- NULL
+    }
+  
     SSE <- sum(residuals^2)
     n <- table(data$id)
     sumn <- sum(n)
 
-    dfTable <- dfl1(tau = tau, lambda = lambda, X = X, wNew = wNew, Z = Z, S = S)
+    #TODO(remove tau from argument list)
+    dfTable <- dfl1(tau = tau, lambda = lambda, X = X, wNew = wNew, Z = Z, S = S, 
+                    SSE = SSE, sumn = sumn, sigma2b = sigma2b, uniUpper = uniUpper)
    
     # use Stein's method if possible, and restricted approximation if necessary
     if(!is.na(dfTable$Overall[which(rownames(dfTable) == "Stein")])) {
@@ -279,8 +319,9 @@ admm <- function(y,
                               rho = rho,
                               tau = tau,
                               X = X,
-                              Z = Z,
-                              S = S,
+                              rand = rand,
+                              y = y, 
+                              id = id,
                               u = u,
                               wNew = wNew),
                 fit = list(residuals = residuals,
@@ -288,7 +329,8 @@ admm <- function(y,
                            df = dfTable,
                            sigma2 = sigma2,
                            sigma2Ridge = sigma2Ridge,
-                           dfSSE = dfSSE))
+                           dfSSE = dfSSE,
+                           sigma2b = sigma2b))
           )
   }
 }

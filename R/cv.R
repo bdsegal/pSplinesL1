@@ -4,6 +4,7 @@ cv <- function(y,
                rand,
                id,
                data,
+               lmeUpdate = FALSE,
                K = 5,
                se1 = FALSE,
                smoothInit = NULL,
@@ -85,11 +86,12 @@ cv <- function(y,
 
   ycol <- which(colnames(data) == y)
   J <- length(X) # number of smooths
-
+  
+  beta0 <- mean(data[, ycol])
   lambdaMax <- rep(NA, J)
   for (j in 1:J) {
-    lambdaMax[j] <- max(abs(solve(tcrossprod(X[[j]]$D, X[[j]]$D), 
-                             tcrossprod(X[[j]]$D, X[[j]]$F) %*% data[, ycol])))
+    lambdaMax[j] <- max(abs(ginv(tcrossprod(X[[j]]$D, X[[j]]$D)) %*% X[[j]]$D %*%
+                            ginv(crossprod(X[[j]]$F, X[[j]]$F)) %*% t(X[[j]]$F) %*% (data[, ycol] - beta0)))
   }
 
   # By default use largest lambdaMax for tau (random effects)
@@ -97,7 +99,7 @@ cv <- function(y,
   if(is.null(tauMax)) {
     tauLambdaMax <- c(max(lambdaMax), lambdaMax)
   } else {
-      tauLambdaMax <- c(tauMax, lambdaMax)
+    tauLambdaMax <- c(tauMax, lambdaMax)
   }
 
   # TODO: allow for different smoothing paths values
@@ -171,12 +173,12 @@ cv <- function(y,
     for (k in 1:K) {
       if (k < K) {
         fold[[k]] <- do.call(c, 
-                  sapply(1:length(ids), function(i) {
+                  lapply(1:length(ids), function(i) {
                     ids[[i]][((k-1)*nid[i] + 1):(k*nid[i])]
                     }))
       } else {
         fold[[k]] <- do.call(c, 
-                  sapply(1:length(ids), function(i) {
+                  lapply(1:length(ids), function(i) {
                     ids[[i]][((k-1)*nid[i] + 1):length(ids[[i]])]
                     }))
       }
@@ -184,15 +186,12 @@ cv <- function(y,
   }
 
   if (is.null(smoothInit)) {
-    smoothOpt <- rep(0, J + 1)
+    smoothOpt <- rep(0, length(smoothPath))
+    # smoothOpt <- c(min(sapply(smoothPath, min), sapply(smoothPath, min))
   } else {
     smoothOpt <- smoothInit
   }
-
   names(smoothOpt) <- c("tau", paste("lambda", 1:J, sep = ""))
-
-  # separate warm starts for each fold
-  warm <- vector("list", K)
 
   CVlong <- data.frame(param = factor(rep(c("tau", paste("lambda[", 1:J, "]", sep = "")), 
                                    each = pathLength),
@@ -202,7 +201,7 @@ cv <- function(y,
                        cv = NA,
                        sd = NA)
 
-  minInd <- rep(NA, 3)
+  minInd <- rep(NA, J + 1)
 
   if (is.null(paramOrder)) {
     cvOrder <- 1:(J+1)
@@ -217,11 +216,24 @@ cv <- function(y,
 
   paramNames <- c("tau", paste("lambda", 1:J, sep = ""))
 
+  if (lmeUpdate) {
+    cvOrder <- cvOrder - 1
+    cvOrder <- cvOrder[which(cvOrder > 0)]
+    smoothOpt <- smoothOpt[-1]
+    paramNames <- paramNames[-1]
+    smoothPath <- smoothPath[-1]
+    CVlong <- CVlong[which(CVlong$param != "tau"), ]
+    minInd <- minInd[-1]
+  }
+
+  # separate warm starts for each fold
+  warm <- vector("list", K)
+
   for (j in cvOrder) {
     for (pathIter in 1:length(smoothPath[[j]])) {
       tauLambda <- smoothOpt
       tauLambda[j] <- smoothPath[[j]][pathIter]
-      names(tauLambda) <- c("tau", paste("lambda", 1:J))
+      names(tauLambda) <- paramNames
 
       if(verbose >= 1) {
         print("")
@@ -248,22 +260,32 @@ cv <- function(y,
           Xtrain[[l]]$F <- X[[l]]$F[!testRec, ]
           Xtest[[l]]$F <- X[[l]]$F[testRec, ]
         }
-
-        Ztrain <- rand$Z[which(!rownames(rand$Z) %in% fold[[k]]), 
+        
+        randTrain <- list()
+        randTrain$Z <- rand$Z[which(!rownames(rand$Z) %in% fold[[k]]), 
                     which(!colnames(rand$Z) %in% fold[[k]])]
 
-        Strain <- rand$S[which(!rownames(rand$S) %in% fold[[k]]), 
-                    which(!colnames(rand$S) %in% fold[[k]])]           
+        randTrain$S <- rand$S[which(!rownames(rand$S) %in% fold[[k]]), 
+                    which(!colnames(rand$S) %in% fold[[k]])]
 
-        m1 <- admm(y = y, X = Xtrain, Z = Ztrain, S = Strain,
-             tau = tauLambda[1],
-             lambda = tauLambda[2:(J + 1)],
+        if (lmeUpdate) {
+          tau = NULL
+          lambda = tauLambda
+        } else {
+          tau = tauLambda[1]
+          lambda = tauLambda[2:(J + 1)]
+        }
+
+        m1 <- admm(y = y, id = id, X = Xtrain, rand = randTrain,
+             tau = tau,
+             lambda = lambda,
              rho = rho,
              epsilonAbs = epsilonAbs,
              epsilonRel = epsilonRel,
              iterMax = iterMax,
              warm = warm[[k]],
              data = train,
+             lmeUpdate = lmeUpdate,
              centerZ = centerZ,
              forCV = TRUE)
 
@@ -311,11 +333,15 @@ cv <- function(y,
       smoothOpt[j] <- smoothPath[[j]][which.min(smoothjcv)]
     }
 
-    cvVlines <- data.frame(pathVal = sapply(1:(J+1), function(l) {
-                                           smoothPath[[l]][minInd[l]]}),
-                           param = c("tau", paste("lambda[", 1:J, "]", sep = "")))
-
   }
+
+  formattedNames <- paramNames
+  lambdaInd <- grep("lambda", formattedNames)
+  formattedNames[lambdaInd] <- paste0("lambda[",1:length(lambdaInd), "]")
+  
+  cvVlines <- data.frame(pathVal = sapply(1:length(smoothPath), function(l) {
+                                         smoothPath[[l]][minInd[l]]}),
+                         param = formattedNames)
 
   gg <- ggplot(aes(x = log(pathVal), y = cv), data = CVlong)+
         geom_point()+

@@ -4,18 +4,16 @@
 \alias{admm}
 \title{ADMM algorithm for fitting l1-penalized additive mixed models}
 \usage{
-admm(y, X, Z, S, lambda, tau, data, rho = 1, epsilonAbs = 1e-04,
-  epsilonRel = 1e-04, iterMax = 1000, warm = NULL, forCV = FALSE,
-  centerZ = FALSE, verbose = FALSE)
+admm(y, id, X, rand, lambda, tau, data, rho = 1, lmeUpdate = FALSE,
+  epsilonAbs = 1e-04, epsilonRel = 1e-04, iterMax = 1000, warm = NULL,
+  forCV = FALSE, centerZ = FALSE, verbose = FALSE, uniUpper = 1000)
 }
 \arguments{
 \item{y}{character string denoting output variable}
 
+\item{id}{character string denoting id variable}
+
 \item{X}{list of fixed effect design matrices setup by l1smooth}
-
-\item{Z}{random effect design matrix setup by randomEffects}
-
-\item{S}{random effect penalty matrix setup by randomEffects}
 
 \item{lambda}{scalar smoothing parameter for random effects}
 
@@ -24,6 +22,8 @@ admm(y, X, Z, S, lambda, tau, data, rho = 1, epsilonAbs = 1e-04,
 \item{data}{dataset}
 
 \item{rho}{ADMM penalty parameter}
+
+\item{lmeUpdate}{TRUE/FALSE if TRUE, uses lme to estimate random effects. Only available for random intercept models.}
 
 \item{epsilonAbs}{absolute error in ADMM (tolerance for convergence)}
 
@@ -36,6 +36,12 @@ admm(y, X, Z, S, lambda, tau, data, rho = 1, epsilonAbs = 1e-04,
 \item{centerZ}{TRUE/FALSE If TRUE, imposes centering constraints on random effects}
 
 \item{verbose}{TRUE/FALSE If TRUE, prints ADMM iteration}
+
+\item{uniUpper}{upper limit used by uniroot to estimate tau (only used when lmeUpdate = TRUE)}
+
+\item{Z}{random effect design matrix setup by randomEffects}
+
+\item{S}{random effect penalty matrix setup by randomEffects}
 
 \item{iterMAx}{maximum number of ADMM iterations}
 }

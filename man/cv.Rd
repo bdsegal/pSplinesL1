@@ -4,10 +4,10 @@
 \alias{cv}
 \title{cross validation for l1-penalized additive mixed models}
 \usage{
-cv(y, X, rand, id, data, K = 5, se1 = FALSE, smoothInit = NULL,
-  pathLength = 20, useTestRanEff = TRUE, tauMax = NULL, revPath = FALSE,
-  paramOrder = NULL, epsilonAbs = 1e-04, epsilonRel = 1e-04,
-  iterMax = 1000, centerZ = FALSE, verbose = 2)
+cv(y, X, rand, id, data, lmeUpdate = FALSE, K = 5, se1 = FALSE,
+  smoothInit = NULL, pathLength = 20, useTestRanEff = TRUE,
+  tauMax = NULL, revPath = FALSE, paramOrder = NULL, epsilonAbs = 1e-04,
+  epsilonRel = 1e-04, iterMax = 1000, centerZ = FALSE, verbose = 2)
 }
 \arguments{
 \item{y}{character string denoting output variable}

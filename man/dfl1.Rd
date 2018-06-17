@@ -4,12 +4,12 @@
 \alias{dfl1}
 \title{Obtain degrees of freedom for l1ADMM objects}
 \usage{
-dfl1(tau, lambda, X, wNew, Z, S)
+dfl1(tau, lambda, X, wNew, Z, S, SSE, sumn, sigma2b, uniUpper = uniUpper)
 }
 \arguments{
-\item{tau}{vector of smoothing parameters for fixed effects}
+\item{tau}{vector of smoothing parameters for random effects}
 
-\item{lambda}{scalar smoothing parameter for random effects}
+\item{lambda}{scalar smoothing parameter for fixed effects}
 
 \item{X}{list of fixed effect design matrices setup by l1smooth}
 

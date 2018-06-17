@@ -1,12 +1,13 @@
 
 # compute confidence intervals for a fitted model
-ci <- function(model, alpha = 0.05) {
+ci <- function(model, alpha = 0.05, newData = NULL) {
   #' Obtain confidence intervals for l1ADMM objects
   #'
   #' This function obtains Bayesian and Frequentist confidence bands
   #' for models fit with the ADMMl1 function
   #' @param model output from l1ADMM with cv = FALSE
   #' @param alpha confidence level
+  #' @param newData new dataset at which to get the predicted values and confidence intervals
   #' @keywords confidence intervals bands
   #' @export
   #' @examples
@@ -49,21 +50,49 @@ ci <- function(model, alpha = 0.05) {
   #'   geom_polygon(data = CIpoly, fill = "grey")+
   #'   geom_line(aes(x = CI[[1]]$x, y = CI[[1]]$smooth))
 
-  J <- length(model$params$X)
-  ord <- order(model$data$x)
+  if (!is.null(newData) & any(!colnames(model$data) %in% colnames(newData))) {
+    stop("New dataset must contain all columns in original dataset")
+  }
 
-  S <- model$params$S
-  Z <- model$params$Z
+  J <- length(model$params$X)
+
+  if (!is.null(newData)) {
+    Xnew <- list()
+    for (j in 1:J) {
+      xcol <- which(colnames(newData) == model$params$X[[j]]$x)
+      Xnew[[j]] <- psSub(xcol, 
+                         x = model$params$X[[j]]$x,
+                         basis = model$params$X[[j]]$basis, 
+                         norder = model$params$X[[j]]$norder,
+                         k = model$params$X[[j]]$k, 
+                         data = newData,
+                         by = model$params$X[[j]]$by,
+                         ref = model$params$X[[j]]$ref,
+                         width = model$params$X[[j]]$width,
+                         center = model$params$X[[j]]$center)
+
+    }
+  }
 
   sigma2 <- model$fit$sigma2
-  sigma2b <- sigma2 / model$params$tau
-
+  if (is.null(model$fit$sigma2b)) {
+    sigma2b <- sigma2 / model$params$tau
+  } else {
+    sigma2b <- model$fit$sigma2b
+  }
+  
+  S <- model$params$rand$S
+  Z <- model$params$rand$Z 
   V <- sigma2b * Z %*% tcrossprod(ginv(as.matrix(S)), Z) + diag(sigma2, nrow(Z))
 
   # smooths (beta_1 through beta_J), assume intercept should be added to beta_1 only
   smooth <- list()
   for (j in 1:J) {
-    smooth[[j]] <- as.vector(model$param$X[[j]]$F %*% model$coef$beta[[j]])
+    if (is.null(newData)) {
+      smooth[[j]] <- as.vector(model$param$X[[j]]$F %*% model$coef$beta[[j]])
+    } else {
+      smooth[[j]] <- as.vector(Xnew[[j]]$F %*% model$coef$beta[[j]])
+    }
   }
   smooth[[1]] <- smooth[[1]] + model$coefs$beta0
   
@@ -74,13 +103,19 @@ ci <- function(model, alpha = 0.05) {
   yLowerPoint <- list()
 
   for (j in 1:J) {
-    print(j)
     
+    if (!is.null(newData)) {
+      Fnew <- Xnew[[j]]$F
+    } else {
+      Fnew <- model$params$X[[j]]$F
+    }
+
     F <- model$params$X[[j]]$F
     D <- model$params$X[[j]]$D
     Lambda <- model$params$lambda[j] * crossprod(D)
 
     if(j == 1) {
+      Fnew <- cbind(1, Fnew)
       F <- cbind(1, F)
       D <- bdiag(0, D)
       Lambda <- bdiag(0, Lambda)
@@ -90,9 +125,9 @@ ci <- function(model, alpha = 0.05) {
 
     W <- crossprod(F, solve(V, F)) + Lambda
     Winv <- ginv(as.matrix(W)) # ginv probably not necessary, but safer coding
-    HtHnormDiagBayes <- sqrt(rowSums((F %*% Winv) * F))
+    HtHnormDiagBayes <- sqrt(rowSums((Fnew %*% Winv) * Fnew))
    
-    H <- F %*% solve(crossprod(F) + Lambda, t(F))
+    H <- Fnew %*% solve(crossprod(F) + Lambda, t(F))
     HtHnormDiag <- sqrt(rowSums((H %*% V) * H))
 
     zQuant <- qnorm(1-alpha/2)
@@ -102,10 +137,22 @@ ci <- function(model, alpha = 0.05) {
     yLowerPoint[[j]] <- as.vector(smooth[[j]] - zQuant * HtHnormDiag)
   }
 
+  xcol <- which(colnames(model$data) == model$params$X[[1]]$x)
+  if (is.null(newData)) {
+    ord <- order(model$data[, xcol])
+  } else {
+    ord <- order(newData$x)
+  }
+  
   CI <- list()
   for (j in 1:J) {
     ordKeep <- ord[which(ord %in% keep[[j]])]
-    CI[[j]] <- data.frame(x =  model$data$x[ordKeep],
+    if (is.null(newData)) {
+      xOut <- model$data$x[ordKeep]
+    } else {
+      xOut <- newData$x[ordKeep]
+    }
+    CI[[j]] <- data.frame(x =  xOut,
                           smooth = smooth[[j]][ordKeep],
                           yUpperBayesQuick = yUpperBayesQuick[[j]][ordKeep],
                           yLowerBayesQuick = yLowerBayesQuick[[j]][ordKeep],
@@ -119,8 +166,8 @@ ci <- function(model, alpha = 0.05) {
   return(CI)
 }
 
-print.ci <- function(CI) {
-  #' Print function for confidence bands
+plot.ci <- function(CI) {
+  #' Plot function for confidence bands
   #'
   #' This function plots the confidence bands
   #' @param CI output from the ci function
@@ -132,8 +179,7 @@ print.ci <- function(CI) {
                          y = c(CI[[j]]$yLowerBayesQuick, 
                                rev(CI[[j]]$yUpperBayesQuick)))
 
-    yRange <- range(c(CI[[j]]$yLowerBayesQuick, 
-                       CI[[j]]$yUpperBayesQuick))
+    yRange <- range(c(CI[[j]]$yLowerBayesQuick, CI[[j]]$yUpperBayesQuick))
 
     par(mar = c(5, 5, 4, 2))
     plot(x = CI[[j]]$x, y = CI[[j]]$smooth, type = "n",
