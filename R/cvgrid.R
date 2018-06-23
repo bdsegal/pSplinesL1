@@ -78,8 +78,7 @@ cvgrid <- function(y,
   #' 
   #' # extract values from ci object for custom plotting
   #' CIpoly <- data.frame(x = c(CI[[1]]$x, rev(CI[[1]]$x)), 
-  #'                      y = c(CI[[1]]$yLowerBayesQuick, 
-  #'                            rev(CI[[1]]$yUpperBayesQuick)))
+  #'                      y = c(CI[[1]]$lower, rev(CI[[1]]$upper)))
   #' 
   #' ggplot(aes(x = x, y = y), data = newDat)+
   #'   geom_polygon(data = CIpoly, fill = "grey")+

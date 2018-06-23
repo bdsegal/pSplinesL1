@@ -63,7 +63,7 @@ rand <- re(x = "x", id = "id", data = simData,
 
 # fit model with ADMM
 a1 <- admm(y = "y", X, Z = rand$Z, S = rand$S,
-            tau = 0.0502,
+            lmeUpdate = TRUE,
             lambda = 0.169,
             rho = 0.169,
             data = simData)
@@ -74,8 +74,7 @@ plot(CI)
 
 # extract values from ci object for custom plotting
 CIpoly <- data.frame(x = c(CI[[1]]$x, rev(CI[[1]]$x)), 
-                     y = c(CI[[1]]$yLowerBayesQuick, 
-                           rev(CI[[1]]$yUpperBayesQuick)))
+                     y = c(CI[[1]]$lower, rev(CI[[1]]$upper)))
 
 ggplot(aes(x = x, y = y), data = newDat)+
   geom_polygon(data = CIpoly, fill = "grey")+

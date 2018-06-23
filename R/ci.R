@@ -1,6 +1,4 @@
-
-# compute confidence intervals for a fitted model
-ci <- function(model, alpha = 0.05, newData = NULL) {
+ci <- function(model, alpha = 0.05, newData = NULL, lenOut = 100) {
   #' Obtain confidence intervals for l1ADMM objects
   #'
   #' This function obtains Bayesian and Frequentist confidence bands
@@ -43,8 +41,8 @@ ci <- function(model, alpha = 0.05, newData = NULL) {
   #' 
   #' # extract values from ci object for custom plotting
   #' CIpoly <- data.frame(x = c(CI[[1]]$x, rev(CI[[1]]$x)), 
-  #'                      y = c(CI[[1]]$yLowerBayesQuick, 
-  #'                            rev(CI[[1]]$yUpperBayesQuick)))
+  #'                      y = c(CI[[1]]$lower, 
+  #'                            rev(CI[[1]]$upper)))
   #' 
   #' ggplot(aes(x = x, y = y), data = newDat)+
   #'   geom_polygon(data = CIpoly, fill = "grey")+
@@ -55,23 +53,39 @@ ci <- function(model, alpha = 0.05, newData = NULL) {
   }
 
   J <- length(model$params$X)
+  Xnew <- list()
+  xSorted <- list()
 
-  if (!is.null(newData)) {
-    Xnew <- list()
-    for (j in 1:J) {
+  for (j in 1:J) {
+    if (!is.null(newData)) {
       xcol <- which(colnames(newData) == model$params$X[[j]]$x)
-      Xnew[[j]] <- psSub(xcol, 
-                         x = model$params$X[[j]]$x,
-                         basis = model$params$X[[j]]$basis, 
-                         norder = model$params$X[[j]]$norder,
-                         k = model$params$X[[j]]$k, 
-                         data = newData,
-                         by = model$params$X[[j]]$by,
-                         ref = model$params$X[[j]]$ref,
-                         width = model$params$X[[j]]$width,
-                         center = model$params$X[[j]]$center)
-
+      xSorted[[j]] <- sort(newData[, xcol])
+    } else {
+      xcol <- which(colnames(model$data) == model$params$X[[j]]$x)
+      xSorted[[j]] <- sort(model$data[, xcol])
     }
+
+    predictData <- data.frame(x = xSorted)
+
+    byVal <- model$params$X[[j]]$by
+    if(!is.null(byVal)) {
+      if (!is.null(newData)) {
+        predictData[, byVal] <- newData[, byVal]
+      } else {
+        predictData[, byVal] <- model$data[, byVal]
+      }
+    }
+
+    Xnew[[j]] <- psSub(xcol, 
+                       x = model$params$X[[j]]$x,
+                       basis = model$params$X[[j]]$basis, 
+                       norder = model$params$X[[j]]$norder,
+                       k = model$params$X[[j]]$k, 
+                       data = predictData,
+                       by = model$params$X[[j]]$by,
+                       ref = model$params$X[[j]]$ref,
+                       width = model$params$X[[j]]$width,
+                       center = model$params$X[[j]]$center)
   }
 
   sigma2 <- model$fit$sigma2
@@ -88,11 +102,7 @@ ci <- function(model, alpha = 0.05, newData = NULL) {
   # smooths (beta_1 through beta_J), assume intercept should be added to beta_1 only
   smooth <- list()
   for (j in 1:J) {
-    if (is.null(newData)) {
-      smooth[[j]] <- as.vector(model$param$X[[j]]$F %*% model$coef$beta[[j]])
-    } else {
       smooth[[j]] <- as.vector(Xnew[[j]]$F %*% model$coef$beta[[j]])
-    }
   }
   smooth[[1]] <- smooth[[1]] + model$coefs$beta0
   
@@ -103,13 +113,8 @@ ci <- function(model, alpha = 0.05, newData = NULL) {
   yLowerPoint <- list()
 
   for (j in 1:J) {
-    
-    if (!is.null(newData)) {
-      Fnew <- Xnew[[j]]$F
-    } else {
-      Fnew <- model$params$X[[j]]$F
-    }
 
+    Fnew <- Xnew[[j]]$F
     F <- model$params$X[[j]]$F
     D <- model$params$X[[j]]$D
     Lambda <- model$params$lambda[j] * crossprod(D)
@@ -120,8 +125,6 @@ ci <- function(model, alpha = 0.05, newData = NULL) {
       D <- bdiag(0, D)
       Lambda <- bdiag(0, Lambda)
     }
-
-    keep[[j]] <- which(rowSums(F) != 0)
 
     W <- crossprod(F, solve(V, F)) + Lambda
     Winv <- ginv(as.matrix(W)) # ginv probably not necessary, but safer coding
@@ -137,27 +140,14 @@ ci <- function(model, alpha = 0.05, newData = NULL) {
     yLowerPoint[[j]] <- as.vector(smooth[[j]] - zQuant * HtHnormDiag)
   }
 
-  xcol <- which(colnames(model$data) == model$params$X[[1]]$x)
-  if (is.null(newData)) {
-    ord <- order(model$data[, xcol])
-  } else {
-    ord <- order(newData$x)
-  }
-  
   CI <- list()
   for (j in 1:J) {
-    ordKeep <- ord[which(ord %in% keep[[j]])]
-    if (is.null(newData)) {
-      xOut <- model$data$x[ordKeep]
-    } else {
-      xOut <- newData$x[ordKeep]
-    }
-    CI[[j]] <- data.frame(x =  xOut,
-                          smooth = smooth[[j]][ordKeep],
-                          yUpperBayesQuick = yUpperBayesQuick[[j]][ordKeep],
-                          yLowerBayesQuick = yLowerBayesQuick[[j]][ordKeep],
-                          yLowerPoint = yLowerPoint[[j]][ordKeep],
-                          yUpperPoint = yUpperPoint[[j]][ordKeep]
+    CI[[j]] <- data.frame(x =  xSorted[[j]],
+                          smooth = smooth[[j]],
+                          lower = yLowerBayesQuick[[j]],
+                          upper = yUpperBayesQuick[[j]],
+                          lowerFrequentist = yLowerPoint[[j]],
+                          upperFrequentist = yUpperPoint[[j]]
                           )
   }
 
@@ -176,10 +166,9 @@ plot.ci <- function(CI) {
   J <- length(CI)
   for (j in 1:J) {
     CIpoly <- data.frame(x = c(CI[[j]]$x, rev(CI[[j]]$x)), 
-                         y = c(CI[[j]]$yLowerBayesQuick, 
-                               rev(CI[[j]]$yUpperBayesQuick)))
+                         y = c(CI[[j]]$lower, rev(CI[[j]]$upper)))
 
-    yRange <- range(c(CI[[j]]$yLowerBayesQuick, CI[[j]]$yUpperBayesQuick))
+    yRange <- range(c(CI[[j]]$lower, CI[[j]]$upper))
 
     par(mar = c(5, 5, 4, 2))
     plot(x = CI[[j]]$x, y = CI[[j]]$smooth, type = "n",

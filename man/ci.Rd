@@ -4,7 +4,7 @@
 \alias{ci}
 \title{Obtain confidence intervals for l1ADMM objects}
 \usage{
-ci(model, alpha = 0.05, newData = NULL)
+ci(model, alpha = 0.05, newData = NULL, lenOut = 100)
 }
 \arguments{
 \item{model}{output from l1ADMM with cv = FALSE}
@@ -50,8 +50,8 @@ plot(CI)
 
 # extract values from ci object for custom plotting
 CIpoly <- data.frame(x = c(CI[[1]]$x, rev(CI[[1]]$x)), 
-                     y = c(CI[[1]]$yLowerBayesQuick, 
-                           rev(CI[[1]]$yUpperBayesQuick)))
+                     y = c(CI[[1]]$lower, 
+                           rev(CI[[1]]$upper)))
 
 ggplot(aes(x = x, y = y), data = newDat)+
   geom_polygon(data = CIpoly, fill = "grey")+

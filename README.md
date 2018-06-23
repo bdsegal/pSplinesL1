@@ -26,27 +26,27 @@ cvOut <- cv(y = "y", id = "id", X = X, rand = rand,
                   K = 5,
                   pathLength = 20,
                   data = simData)
-cvOut
+plot(cvOut)
 
 # fit model with all data
-a1 <- admm(y = "y", X, Z = rand$Z, S = rand$S,
-            tau = cvOut$smoothOpt[1],
+a1 <- admm(y = "y", id = "id", X = X, rand = rand,
             lambda = cvOut$smoothOpt[2:(length(X)+1)],
+            lmeUpdate = TRUE,
             rho = min(5, max(cvOut$smoothOpt)),
             data = simData)
 
 # get and plot fitted model with confidence bands
 CI <- ci(model = a1, alpha = 0.05)
-CI
+plot(CI)
 
 # extract values from ci object for custom plotting
 CIpoly <- data.frame(x = c(CI[[1]]$x, rev(CI[[1]]$x)), 
-                     y = c(CI[[1]]$yLowerBayesQuick, 
-                           rev(CI[[1]]$yUpperBayesQuick)))
+                     y = c(CI[[1]]$lower, rev(CI[[1]]$upper)))
 
-ggplot(aes(x = x, y = y), data = newDat)+
+ggplot(aes(x = x, y = y), data = trueMean)+
   geom_polygon(data = CIpoly, fill = "grey")+
-  geom_line(aes(x = CI[[1]]$x, y = CI[[1]]$smooth))
+  geom_line(color = "black") +
+  geom_line(aes(y = smooth), data = CI[[1]], color = "red")
 ```
 
 ## References
