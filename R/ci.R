@@ -48,8 +48,10 @@ ci <- function(model, alpha = 0.05, newData = NULL, lenOut = 100) {
   #'   geom_polygon(data = CIpoly, fill = "grey")+
   #'   geom_line(aes(x = CI[[1]]$x, y = CI[[1]]$smooth))
 
-  if (!is.null(newData) & any(!colnames(model$data) %in% colnames(newData))) {
-    stop("New dataset must contain all columns in original dataset")
+  covariates <- unique(do.call(c, lapply(model$params$X, function(x){c(x$x, x$by)})))
+
+  if (!is.null(newData) & any(!covariates %in% colnames(newData))) {
+    stop("New dataset must contain all predictors in original dataset")
   }
 
   J <- length(model$params$X)
@@ -59,22 +61,17 @@ ci <- function(model, alpha = 0.05, newData = NULL, lenOut = 100) {
   for (j in 1:J) {
     if (!is.null(newData)) {
       xcol <- which(colnames(newData) == model$params$X[[j]]$x)
-      xSorted[[j]] <- sort(newData[, xcol])
+      xSorted[[j]] <- sort(unique(newData[, xcol]))
     } else {
       xcol <- which(colnames(model$data) == model$params$X[[j]]$x)
-      xSorted[[j]] <- sort(model$data[, xcol])
+      xSorted[[j]] <- sort(unique(model$data[, xcol]))
     }
 
-    predictData <- data.frame(x = xSorted)
+    predictData <- data.frame(x = xSorted[[j]])
 
+    # always show the effect of a 1 unit increase in by variable
     byVal <- model$params$X[[j]]$by
-    if(!is.null(byVal)) {
-      if (!is.null(newData)) {
-        predictData[, byVal] <- newData[, byVal]
-      } else {
-        predictData[, byVal] <- model$data[, byVal]
-      }
-    }
+    predictData[, byVal] <- 1
 
     Xnew[[j]] <- psSub(xcol, 
                        x = model$params$X[[j]]$x,
@@ -102,11 +99,10 @@ ci <- function(model, alpha = 0.05, newData = NULL, lenOut = 100) {
   # smooths (beta_1 through beta_J), assume intercept should be added to beta_1 only
   smooth <- list()
   for (j in 1:J) {
-      smooth[[j]] <- as.vector(Xnew[[j]]$F %*% model$coef$beta[[j]])
+    smooth[[j]] <- as.vector(Xnew[[j]]$F %*% model$coef$beta[[j]])
   }
   smooth[[1]] <- smooth[[1]] + model$coefs$beta0
   
-  keep <- list()
   yLowerBayesQuick <- list()
   yUpperBayesQuick <- list()
   yUpperPoint <- list()
