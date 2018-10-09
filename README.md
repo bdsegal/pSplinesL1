@@ -1,5 +1,5 @@
 # psplinesl1
-This package fits additive mixed models with P-splines and an l1 penalty using alternating direction method of multipliers and cross validation.
+This package fits additive mixed models with P-splines and an l1 penalty using alternating direction method of multipliers and cross validation (Segal et al., to appear)
 
 ## Installation
 ```{r}
