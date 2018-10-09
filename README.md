@@ -50,4 +50,4 @@ ggplot(aes(x = x, y = y), data = trueMean)+
 ```
 
 ## References
-Segal, B. D., Elliott, M. R., Braun, T., Jiang, H. P-splines with an l1 penalty for repeated measures. Submitted.
+Segal, B. D., Elliott, M. R., Braun, T., Jiang, H. (to appear). P-splines with an l1 penalty for repeated measures. Electronic Journal of Statistics.
